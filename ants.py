@@ -112,7 +112,7 @@ class Ant(threading.Thread):
 
     SPEED = .3
 
-    def __init__(self, level, index, x=20, y=20):
+    def __init__(self, level, index, x=8, y=8):     # init after limit
         threading.Thread.__init__(self)
         self._level = level
         self._id = index
@@ -157,8 +157,9 @@ class Level:
         return self.instance
 
     def __init__(self):
+        self._observer = Observable()
         self._map = self.__genEmptyLevel()
-        self._observer = Observable(initialValue=self._map)
+        self._observer.set(self._map)
 
     def __genEmptyLevel(self):
         limits = (0, self.WIDTH-1, self.HEIGHT-1)
@@ -212,18 +213,18 @@ class Level:
 '''
 classdoc
 '''
-class CanvasController:
+class LevelViewController:
 
     ANTS_COUNT = 400
     
     def __init__(self, root):
         # setup needed models
-        self._level = Level()
+        self._level = Level.instance
         self._level._observer.addCallback(self.levelChanged)
         self._colony = None
         self.__renewColony()
         # setup views
-        self._canvas = CanvasView(parent=root)
+        self._canvas = LevelView(parent=root)
         self._canvas.bind('<Button-1>', self.addOrRemoveWall)
         self._canvas.bind('<B1-Motion>', self.addWall)
         self._canvas.pack()
@@ -239,7 +240,7 @@ class CanvasController:
 
     # Private methods
     def __checkCoord(self, x, y):
-        return x <= 0 or y <= 0 or x >= CanvasView.WIDTH or y >= CanvasView.HEIGHT
+        return x <= 0 or y <= 0 or x >= LevelView.WIDTH or y >= LevelView.HEIGHT
 
     def __renewColony(self):
         self._colony = Colony(self._level, self.ANTS_COUNT)
@@ -298,12 +299,13 @@ class ControlsPanelController:
 '''
 classdoc
 '''
-class CanvasView(tk.Canvas):
+class LevelView(tk.Canvas):
 
     WIDTH  = 640
     HEIGHT = 640
 
     WALL_COLOR = 'black'
+    LIMIT_COLOR = 'gray'
     ANT_COLOR  = 'red'
     
     def __init__(self, parent):
@@ -314,9 +316,11 @@ class CanvasView(tk.Canvas):
         self.clear()    # Clear widget on each call
         for i in range(len(level)):
           for j in range(len(level[0])):
+            posX, posY = i*8, j*8
+            if level[i][j] == Level.LIMIT:
+                self.create_rectangle(posX, posY, posX+8, posY+8, fill=self.LIMIT_COLOR, outline=self.LIMIT_COLOR)                
             if level[i][j] == Level.WALL:
-              posX, posY = i*8, j*8
-              self.create_rectangle(posX, posY, posX+8, posY+8, fill=self.WALL_COLOR)
+                self.create_rectangle(posX, posY, posX+8, posY+8, fill=self.WALL_COLOR)
 
     def repaintAnt(self, ant):
         item = self._items.get(ant._id)
@@ -351,10 +355,11 @@ application frame
 class AppDelegate(tk.Frame):
     
     def __init__(self, root):
-        lvl = Level()
+        root.title('Dummy Ant')
+        self._lvl = Level()
         tk.Frame.__init__(self, root, bg='gray')
         self.__lolMsg()
-        self._canvCtrl = CanvasController(root)
+        self._canvCtrl = LevelViewController(root)
         self._ctrlsPanel = ControlsPanelController(root)
 
     def __lolMsg(self):
