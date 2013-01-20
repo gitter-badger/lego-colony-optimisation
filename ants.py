@@ -9,8 +9,15 @@ import random
 import threading
 import time
 
+
 BTN_WIDTH = 8    # App constant should be moved to settings singleton
 BTN_BG = 'gray'
+
+
+###############################
+#   Models
+###############################
+
 
 '''
 classdoc
@@ -189,6 +196,11 @@ class Level:
         print(''.join(content))
 
 
+###############################
+#   Controllers
+###############################
+
+
 '''
 classdoc
 '''
@@ -263,6 +275,21 @@ class CanvasController:
 '''
 classdoc
 '''
+class ControlsPanelController:
+
+    def __init__(self, root):
+        self._panel = ControlsPanelView(parent=root)
+        self._panel.pack()
+
+
+###############################
+#   Views
+###############################
+
+
+'''
+classdoc
+'''
 class CanvasView(tk.Canvas):
 
     WIDTH  = 640
@@ -298,12 +325,28 @@ class CanvasView(tk.Canvas):
 '''
 classdoc
 '''
+class ControlsPanelView(tk.Frame):
+
+    def __init__(self, parent):
+        tk.Frame.__init__(self, parent)
+        tk.Label(text="hello").pack()
+
+
+###############################
+#   Welcome
+###############################
+
+
+'''
+classdoc
+'''
 class AppMinister(tk.Frame):
     
     def __init__(self, root):
         tk.Frame.__init__(self, root, bg='gray')
         self.__lolMsg()
         self._canvCtrl = CanvasController(root)
+        self._ctrlsPanel = ControlsPanelController(root)
 
     def __lolMsg(self):
         print("Hi, i'm god")
