@@ -148,6 +148,14 @@ class Level:
     WATER    = 2
     RESOURCE = 3
 
+    instance = None    # static class attribute
+
+    def __new__(self):
+        
+        if self.instance is None:
+            self.instance = object.__new__(self)
+        return self.instance
+
     def __init__(self):
         self._map = self.__genEmptyLevel()
         self._observer = Observable(initialValue=self._map)
@@ -329,7 +337,7 @@ class ControlsPanelView(tk.Frame):
 
     def __init__(self, parent):
         tk.Frame.__init__(self, parent)
-        tk.Label(text="hello").pack()
+        tk.Label(text="Controls panel :").pack()
 
 
 ###############################
@@ -338,11 +346,12 @@ class ControlsPanelView(tk.Frame):
 
 
 '''
-classdoc
+application frame
 '''
-class AppMinister(tk.Frame):
+class AppDelegate(tk.Frame):
     
     def __init__(self, root):
+        lvl = Level()
         tk.Frame.__init__(self, root, bg='gray')
         self.__lolMsg()
         self._canvCtrl = CanvasController(root)
@@ -360,7 +369,7 @@ mainloop
 '''
 def main():
     root = tk.Tk()
-    app = AppMinister(root)
+    app = AppDelegate(root)
     root.mainloop()
 
 if __name__ == "__main__":
