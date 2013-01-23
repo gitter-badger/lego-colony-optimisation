@@ -11,13 +11,24 @@ import time
 
 
 BTN_WIDTH = 8    # App constant should be moved to settings singleton
-BTN_BG = 'gray'
 
 
 ###############################
 #   Models
 ###############################
 
+'''
+classdoc
+'''
+class Singleton:
+
+    _instance = None
+
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            cls._instance = super(Singleton, cls).__new__(cls)
+        return cls._instance
+        
 
 '''
 classdoc
@@ -85,11 +96,11 @@ classdoc
 '''
 class Colony:
     
-    def __init__(self, level, mem_count):
-        self._level = level
+    def __init__(self, mem_count):
+        self._level = Level._instance
         self._members = ObservableList()
         for i in range(mem_count):
-            ant = Ant(self._level, i)
+            ant = Ant(index=i)
             ant._observer.addCallback(self.memberMoved)
             self._members.append(ant)   # Use addElement instead of append to trigger callbacks
 
@@ -112,9 +123,9 @@ class Ant(threading.Thread):
 
     SPEED = .05
 
-    def __init__(self, level, index, x=8, y=8):     # init after limit
+    def __init__(self, index, x=8, y=8):     # init after limit
         threading.Thread.__init__(self)
-        self._level = level
+        self._level = Level._instance
         self._id = index
         self._position = (x, y)
         self._observer = Observable(initialValue=self)
@@ -137,7 +148,7 @@ class Ant(threading.Thread):
 '''
 classdoc
 '''
-class Level:
+class Level(Singleton):
 
     WIDTH  = 80
     HEIGHT = 80   # Matrix 80 = 640/8
@@ -147,14 +158,6 @@ class Level:
     WALL     = 1
     WATER    = 2
     RESOURCE = 3
-
-    instance = None    # static class attribute
-
-    def __new__(self):
-        
-        if self.instance is None:
-            self.instance = object.__new__(self)
-        return self.instance
 
     def __init__(self):
         self._observer = Observable()
@@ -213,13 +216,13 @@ class Level:
 '''
 classdoc
 '''
-class LevelViewController:
+class LevelViewController(Singleton):
 
     ANTS_COUNT = 500
     
     def __init__(self, root):
         # setup needed models
-        self._level = Level.instance
+        self._level = Level._instance
         self._level._observer.addCallback(self.levelChanged)
         self._colony = None
         self.__renewColony()
@@ -227,23 +230,14 @@ class LevelViewController:
         self._canvas = LevelView(parent=root)
         self._canvas.bind('<Button-1>', self.addOrRemoveWall)
         self._canvas.bind('<B1-Motion>', self.addWall)
-        self._canvas.pack()
-        # TODO: move this shit out of this controller!!!
-        self._runBtn = tk.Button(root, text="Run", width=BTN_WIDTH, bg=BTN_BG, command=self.runSimulation)
-        self._runBtn.pack()
-        self._stopBtn = tk.Button(root, text="Stop", width=BTN_WIDTH, bg=BTN_BG, command=self.stopSimulation)
-        self._stopBtn.pack()
-        self._resetBtn = tk.Button(root, text="Reset", width=BTN_WIDTH, bg=BTN_BG, command=self.resetLevel)
-        self._resetBtn.pack()
-        self._debugBtn = tk.Button(root, text="Debug", width=BTN_WIDTH, bg=BTN_BG, command=self._level.log)
-        self._debugBtn.pack()
+        self._canvas.pack(side='left')
 
     # Private methods
     def __checkCoord(self, x, y):
         return x <= 0 or y <= 0 or x >= LevelView.WIDTH or y >= LevelView.HEIGHT
 
     def __renewColony(self):
-        self._colony = Colony(self._level, self.ANTS_COUNT)
+        self._colony = Colony(self.ANTS_COUNT)
         self._colony._members.addCallback(self.antMoved)
 
     # Canvas events handler
@@ -284,11 +278,11 @@ class LevelViewController:
 '''
 classdoc
 '''
-class ControlsPanelController:
+class PanelViewController(Singleton):
 
     def __init__(self, root):
         self._panel = ControlsPanelView(parent=root)
-        self._panel.pack()
+        self._panel.pack(side='left', anchor='n')
 
 
 ###############################
@@ -334,11 +328,14 @@ class LevelView(tk.Canvas):
 '''
 classdoc
 '''
-class ControlsPanelView(tk.Frame):
+class PanelView(tk.Frame):
 
     def __init__(self, parent):
         tk.Frame.__init__(self, parent)
-        tk.Label(text="Controls panel :").pack()
+        tk.Button(self, text="Run", width=BTN_WIDTH, command=LevelViewController._instance.runSimulation).pack()
+        tk.Button(self, text="Stop", width=BTN_WIDTH, command=LevelViewController._instance.stopSimulation).pack()
+        tk.Button(self, text="Reset", width=BTN_WIDTH, command=LevelViewController._instance.resetLevel).pack()
+        tk.Button(self, text="Debug", width=BTN_WIDTH, command=Level._instance.log).pack()
 
 
 ###############################
@@ -347,23 +344,16 @@ class ControlsPanelView(tk.Frame):
 
 
 '''
-application frame
+application delegate
 '''
-class AppDelegate(tk.Frame):
+class AppDelegate:
     
     def __init__(self, root):
-        root.title('Dummy Ant')
-        self._lvl = Level()
-        tk.Frame.__init__(self, root, bg='gray')
-        self.__lolMsg()
-        self._canvCtrl = LevelViewController(root)
-        self._ctrlsPanel = ControlsPanelController(root)
-
-    def __lolMsg(self):
-        print("Hi, i'm god")
-        print("I am the owner of controllers")
-        print("Dont fuck up with me or i'll freeze your ass bitch!")
-        print("Oh, by the way, app initialized")
+        root.title('Dummy Ants')
+        # init singletons classes
+        Level()
+        LevelViewController(root)
+        ControlsPanelController(root)
 
 
 '''
