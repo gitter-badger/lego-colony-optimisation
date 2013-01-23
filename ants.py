@@ -110,7 +110,7 @@ classdoc
 '''
 class Ant(threading.Thread):
 
-    SPEED = .3
+    SPEED = .05
 
     def __init__(self, level, index, x=8, y=8):     # init after limit
         threading.Thread.__init__(self)
@@ -215,7 +215,7 @@ classdoc
 '''
 class LevelViewController:
 
-    ANTS_COUNT = 400
+    ANTS_COUNT = 500
     
     def __init__(self, root):
         # setup needed models
@@ -305,7 +305,6 @@ class LevelView(tk.Canvas):
     HEIGHT = 640
 
     WALL_COLOR = 'black'
-    LIMIT_COLOR = 'gray'
     ANT_COLOR  = 'red'
     
     def __init__(self, parent):
@@ -316,9 +315,7 @@ class LevelView(tk.Canvas):
         self.clear()    # Clear widget on each call
         for i in range(len(level)):
           for j in range(len(level[0])):
-            posX, posY = i*8, j*8
-            if level[i][j] == Level.LIMIT:
-                self.create_rectangle(posX, posY, posX+8, posY+8, fill=self.LIMIT_COLOR, outline=self.LIMIT_COLOR)                
+            posX, posY = i*8, j*8               
             if level[i][j] == Level.WALL:
                 self.create_rectangle(posX, posY, posX+8, posY+8, fill=self.WALL_COLOR)
 
@@ -380,11 +377,3 @@ def main():
 if __name__ == "__main__":
     main()
 
-
-
-# GARBAGE ???
-#items = ["Apple", "Banana", "Cherry"]
-#self._list = tk.Listbox(root, width=8, height=8)
-#for item in items:
-#self._list.insert(tk.END, item)
-#self._list.pack()
