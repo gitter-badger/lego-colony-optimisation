@@ -281,7 +281,7 @@ classdoc
 class PanelViewController(Singleton):
 
     def __init__(self, root):
-        self._panel = ControlsPanelView(parent=root)
+        self._panel = PanelView(parent=root)
         self._panel.pack(side='left', anchor='n')
 
 
@@ -332,10 +332,16 @@ class PanelView(tk.Frame):
 
     def __init__(self, parent):
         tk.Frame.__init__(self, parent)
-        tk.Button(self, text="Run", width=BTN_WIDTH, command=LevelViewController._instance.runSimulation).pack()
-        tk.Button(self, text="Stop", width=BTN_WIDTH, command=LevelViewController._instance.stopSimulation).pack()
-        tk.Button(self, text="Reset", width=BTN_WIDTH, command=LevelViewController._instance.resetLevel).pack()
-        tk.Button(self, text="Debug", width=BTN_WIDTH, command=Level._instance.log).pack()
+        # init widgets
+        self._runBtn = tk.Button(self, text="Run", width=BTN_WIDTH, command=LevelViewController._instance.runSimulation)
+        self._stopBtn = tk.Button(self, text="Stop", width=BTN_WIDTH, command=LevelViewController._instance.stopSimulation)
+        self._resetBtn = tk.Button(self, text="Reset", width=BTN_WIDTH, command=LevelViewController._instance.resetLevel)
+        self._debugBtn = tk.Button(self, text="Debug", width=BTN_WIDTH, command=Level._instance.log)
+        # bundle
+        self._runBtn.pack()
+        self._stopBtn.pack()
+        self._resetBtn.pack()
+        self._debugBtn.pack()
 
 
 ###############################
@@ -353,7 +359,7 @@ class AppDelegate:
         # init singletons classes
         Level()
         LevelViewController(root)
-        ControlsPanelController(root)
+        PanelViewController(root)
 
 
 '''
