@@ -224,12 +224,12 @@ class LevelViewController:
         self._colony = None
         self.__renewColony()
         # setup controls view
-        self._panel = PanelView(parent=root)
-        self._panel.pack(side='left', anchor='n')
-        self._panel._run.config(command=self.runSimulation)
-        self._panel._stop.config(command=self.stopSimulation)
-        self._panel._reset.config(command=self.resetLevel)
-        self._panel._debug.config(command=self.debug)
+        self._controls = ControlsView(parent=root)
+        self._controls.pack(side='left', anchor='n')
+        self._controls._run.config(command=self.runSimulation)
+        self._controls._stop.config(command=self.stopSimulation)
+        self._controls._reset.config(command=self.resetLevel)
+        self._controls._debug.config(command=self.debug)
         # setup canvas view
         self._canvas = LevelView(parent=root)
         self._canvas.bind('<Button-1>', self.addOrRemoveWall)
@@ -266,14 +266,14 @@ class LevelViewController:
             self._canvas.clear()
 
     def runSimulation(self):
-        self._panel.switchBtnState()
+        self._controls.switchBtnState()
         self._colony.explore()
         
 
     def stopSimulation(self):
         self._colony.genocide()
         self.__renewColony()
-        self._panel.switchBtnState()
+        self._controls.switchBtnState()
 
     def debug(self):
         Level._instance.log()
@@ -329,19 +329,19 @@ class LevelView(tk.Canvas):
 '''
 classdoc
 '''
-class PanelView(tk.Frame):
+class ControlsView(tk.Frame):
 
     BTN_WIDTH = 8 
 
     def __init__(self, parent):
         tk.Frame.__init__(self, parent)
-        self._run = tk.Button(self, text="Run", width=BTN_WIDTH)
+        self._run = tk.Button(self, text="Run", width=self.BTN_WIDTH)
         self._run.pack()
-        self._stop = tk.Button(self, text="Stop", width=BTN_WIDTH, state='disabled')
+        self._stop = tk.Button(self, text="Stop", width=self.BTN_WIDTH, state='disabled')
         self._stop.pack()
-        self._reset = tk.Button(self, text="Reset", width=BTN_WIDTH)
+        self._reset = tk.Button(self, text="Reset", width=self.BTN_WIDTH)
         self._reset.pack()
-        self._debug = tk.Button(self, text="Debug", width=BTN_WIDTH)
+        self._debug = tk.Button(self, text="Debug", width=self.BTN_WIDTH)
         self._debug.pack()
 
     def switchBtnState(self):
