@@ -10,9 +10,6 @@ import threading
 import time
 
 
-BTN_WIDTH = 8    # App constant should be moved to settings singleton
-
-
 ###############################
 #   Models
 ###############################
@@ -216,7 +213,7 @@ class Level(Singleton):
 '''
 classdoc
 '''
-class LevelViewController(Singleton):
+class LevelViewController:
 
     ANTS_COUNT = 500
     
@@ -226,11 +223,19 @@ class LevelViewController(Singleton):
         self._level._observer.addCallback(self.levelChanged)
         self._colony = None
         self.__renewColony()
-        # setup views
+        # setup controls view
+        self._panel = PanelView(parent=root)
+        self._panel.pack(side='left', anchor='n')
+        self._panel._run.config(command=self.runSimulation)
+        self._panel._stop.config(command=self.stopSimulation)
+        self._panel._reset.config(command=self.resetLevel)
+        self._panel._debug.config(command=self.debug)
+        # setup canvas view
         self._canvas = LevelView(parent=root)
         self._canvas.bind('<Button-1>', self.addOrRemoveWall)
         self._canvas.bind('<B1-Motion>', self.addWall)
         self._canvas.pack(side='left')
+        
 
     # Private methods
     def __checkCoord(self, x, y):
@@ -261,11 +266,17 @@ class LevelViewController(Singleton):
             self._canvas.clear()
 
     def runSimulation(self):
+        self._panel.switchBtnState()
         self._colony.explore()
+        
 
     def stopSimulation(self):
         self._colony.genocide()
         self.__renewColony()
+        self._panel.switchBtnState()
+
+    def debug(self):
+        Level._instance.log()
 
     # Models callbacks
     def antMoved(self, ant):
@@ -273,16 +284,6 @@ class LevelViewController(Singleton):
 
     def levelChanged(self, level):
         self._canvas.repaintLevel(level)
-
-
-'''
-classdoc
-'''
-class PanelViewController(Singleton):
-
-    def __init__(self, root):
-        self._panel = PanelView(parent=root)
-        self._panel.pack(side='left', anchor='n')
 
 
 ###############################
@@ -330,18 +331,22 @@ classdoc
 '''
 class PanelView(tk.Frame):
 
+    BTN_WIDTH = 8 
+
     def __init__(self, parent):
         tk.Frame.__init__(self, parent)
-        # init widgets
-        self._runBtn = tk.Button(self, text="Run", width=BTN_WIDTH, command=LevelViewController._instance.runSimulation)
-        self._stopBtn = tk.Button(self, text="Stop", width=BTN_WIDTH, command=LevelViewController._instance.stopSimulation)
-        self._resetBtn = tk.Button(self, text="Reset", width=BTN_WIDTH, command=LevelViewController._instance.resetLevel)
-        self._debugBtn = tk.Button(self, text="Debug", width=BTN_WIDTH, command=Level._instance.log)
-        # bundle
-        self._runBtn.pack()
-        self._stopBtn.pack()
-        self._resetBtn.pack()
-        self._debugBtn.pack()
+        self._run = tk.Button(self, text="Run", width=BTN_WIDTH)
+        self._run.pack()
+        self._stop = tk.Button(self, text="Stop", width=BTN_WIDTH, state='disabled')
+        self._stop.pack()
+        self._reset = tk.Button(self, text="Reset", width=BTN_WIDTH)
+        self._reset.pack()
+        self._debug = tk.Button(self, text="Debug", width=BTN_WIDTH)
+        self._debug.pack()
+
+    def switchBtnState(self):
+        for btn in (self._run, self._stop):
+            btn.config(state='disabled') if btn['state'] == 'normal' else btn.config(state='normal')
 
 
 ###############################
@@ -352,14 +357,12 @@ class PanelView(tk.Frame):
 '''
 application delegate
 '''
-class AppDelegate:
+class AppDelegate(Singleton):
     
     def __init__(self, root):
         root.title('Dummy Ants')
-        # init singletons classes
         Level()
         LevelViewController(root)
-        PanelViewController(root)
 
 
 '''
