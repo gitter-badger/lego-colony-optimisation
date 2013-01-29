@@ -118,7 +118,7 @@ classdoc
 '''
 class Ant(threading.Thread):
 
-    SPEED = .05
+    SPEED = .02
 
     def __init__(self, index, x=8, y=8):     # init after limit
         threading.Thread.__init__(self)
@@ -177,14 +177,14 @@ class Level(Singleton):
         self._map = self.__genEmptyLevel()
         self._observer.set(self._map)
 
+    def collide(self, x, y):
+        return self._map[x][y] != self.EMPTY
+
     def setOrUnsetWall(self, x, y):
         if self.collide(x, y):
             self.unsetWall(x, y)
         else:
             self.setWall(x, y)
-
-    def collide(self, x, y):
-        return self._map[x][y] != self.EMPTY
 
     def setWall(self, x, y):
         if not self.collide(x, y):
@@ -234,6 +234,7 @@ class LevelViewController:
         self._canvas = LevelView(parent=root)
         self._canvas.bind('<Button-1>', self.addOrRemoveWall)
         self._canvas.bind('<B1-Motion>', self.addWall)
+        self._canvas.bind('<Button-2>', self.addColony)
         self._canvas.pack(side='left')
         
 
@@ -256,11 +257,13 @@ class LevelViewController:
             return
         self._level.setOrUnsetWall(x=event.x//8, y=event.y//8) # Convert to level coordiantes using floor division
 
+    def addColony(self, event):
+        print("add colony")
+
     # Buttons events handlers
     def resetLevel(self):
         result = tk.messagebox.askyesno("Confirmation", "Are You Sure?", icon='warning')
         if result == True:
-            self.stopSimulation()
             self.__renewColony()
             self._level.reset()
             self._canvas.clear()
@@ -268,7 +271,6 @@ class LevelViewController:
     def runSimulation(self):
         self._controls.switchBtnState()
         self._colony.explore()
-        
 
     def stopSimulation(self):
         self._colony.genocide()
@@ -334,7 +336,7 @@ class ControlsView(tk.Frame):
     BTN_WIDTH = 8 
 
     def __init__(self, parent):
-        tk.Frame.__init__(self, parent)
+        tk.Frame.__init__(self, parent, bg='gray')
         self._run = tk.Button(self, text="Run", width=self.BTN_WIDTH)
         self._run.pack()
         self._stop = tk.Button(self, text="Stop", width=self.BTN_WIDTH, state='disabled')
@@ -345,7 +347,7 @@ class ControlsView(tk.Frame):
         self._debug.pack()
 
     def switchBtnState(self):
-        for btn in (self._run, self._stop):
+        for btn in (self._run, self._stop, self._reset):
             btn.config(state='disabled') if btn['state'] == 'normal' else btn.config(state='normal')
 
 
