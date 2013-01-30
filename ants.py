@@ -225,8 +225,8 @@ class LevelViewController:
         self.__renewColony()
         # setup controls view
         self._controls = ControlsView(parent=root)
-        self._controls.pack(side='left', anchor='n')
-        self._controls._run.config(command=self.runSimulation)
+        self._controls.pack(side='left', anchor='n', fill='y')
+        self._controls._run.config(command=self.runSimulation)      # register view callbacks
         self._controls._stop.config(command=self.stopSimulation)
         self._controls._reset.config(command=self.resetLevel)
         self._controls._debug.config(command=self.debug)
@@ -235,7 +235,7 @@ class LevelViewController:
         self._canvas.bind('<Button-1>', self.addOrRemoveWall)
         self._canvas.bind('<B1-Motion>', self.addWall)
         self._canvas.bind('<Button-2>', self.addColony)
-        self._canvas.pack(side='left')
+        self._canvas.pack(side='left', anchor='n')
         
 
     # Private methods
@@ -305,7 +305,7 @@ class LevelView(tk.Canvas):
     ANT_COLOR  = 'red'
     
     def __init__(self, parent):
-        tk.Canvas.__init__(self, parent, width=self.WIDTH, height=self.HEIGHT)
+        tk.Canvas.__init__(self, parent, width=self.WIDTH, height=self.HEIGHT, relief=tk.GROOVE, bd=1)
         self._items = {}
 
     def repaintLevel(self, level):
@@ -337,13 +337,13 @@ class ControlsView(tk.Frame):
 
     def __init__(self, parent):
         tk.Frame.__init__(self, parent, bg='gray')
-        self._run = tk.Button(self, text="Run", width=self.BTN_WIDTH)
+        self._run = tk.Button(self, text="Run", width=self.BTN_WIDTH, highlightbackground='gray')
         self._run.pack()
-        self._stop = tk.Button(self, text="Stop", width=self.BTN_WIDTH, state='disabled')
+        self._stop = tk.Button(self, text="Stop", width=self.BTN_WIDTH, state='disabled', highlightbackground='gray')
         self._stop.pack()
-        self._reset = tk.Button(self, text="Reset", width=self.BTN_WIDTH)
+        self._reset = tk.Button(self, text="Reset", width=self.BTN_WIDTH, highlightbackground='gray')
         self._reset.pack()
-        self._debug = tk.Button(self, text="Debug", width=self.BTN_WIDTH)
+        self._debug = tk.Button(self, text="Debug", width=self.BTN_WIDTH, highlightbackground='gray')
         self._debug.pack()
 
     def switchBtnState(self):
