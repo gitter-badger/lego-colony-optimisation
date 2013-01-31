@@ -363,6 +363,7 @@ class AppDelegate(Singleton):
     
     def __init__(self, root):
         root.title('Dummy Ants')
+        root.resizable(0,0)
         Level()
         LevelViewController(root)
 
