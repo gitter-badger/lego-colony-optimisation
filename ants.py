@@ -151,11 +151,12 @@ class Level(Singleton):
     WIDTH  = 80
     HEIGHT = 80   # Matrix 80 = 640/8
 
-    LIMIT    = -1
-    EMPTY    = 0
-    WALL     = 1
-    WATER    = 2
-    RESOURCE = 3
+    LIMIT  = -1
+    EMPTY  = 0
+    WALL   = 1
+    WATER  = 2
+    COLONY = 3
+    FOOD   = 4
 
     def __init__(self):
         self._observer = Observable()
@@ -181,18 +182,21 @@ class Level(Singleton):
     def collide(self, x, y):
         return self._map[x][y] != self.EMPTY
 
-    def setOrUnsetWall(self, x, y):
+    def setOrUnsetItem(self, x, y, kind):
         if self.collide(x, y):
-            self.unsetWall(x, y)
+            self.unsetItem(x, y)
         else:
-            self.setWall(x, y)
+            self.setItem(x, y, kind)
 
-    def setWall(self, x, y):
+    def setItem(self, x, y, kind):
         if not self.collide(x, y):
-            self._map[x][y] = self.WALL
+            if kind == 'wall':
+                self._map[x][y] = self.WALL
+            elif kind == 'water':
+                self._map[x][y] = self.WATER
             self._observer.set(self._map)
 
-    def unsetWall(self, x, y):
+    def unsetItem(self, x, y):
         self._map[x][y] = self.EMPTY
         self._observer.set(self._map)
 
@@ -224,13 +228,23 @@ class LevelViewController:
         self._level._observer.addCallback(self.levelChanged)
         self._colony = None
         self.__renewColony()
+        # setup views
+        left = tk.Frame(root, bg='gray')
+        left.pack(side='left', anchor='n')
         # setup controls view
-        self._controls = ControlsView(parent=root)
-        self._controls.pack(side='left', anchor='n', fill='y')
+        self._controls = ControlsView(parent=left)
+        self._controls.pack(anchor='w')
         self._controls._run.config(command=self.runSimulation)      # register view callbacks
         self._controls._stop.config(command=self.stopSimulation)
         self._controls._reset.config(command=self.resetLevel)
         self._controls._debug.config(command=self.debug)
+        # setup toolbox
+        self._toolbox = ToolboxView(parent=left)
+        self._toolbox.pack(anchor='w')
+        self._currentTool = tk.StringVar()
+        self._currentTool.set('wall')       # initial value is wall
+        for btn in self._toolbox._buttons:
+            btn.config(variable=self._currentTool)
         # setup canvas view
         self._canvas = LevelView(parent=root)
         self._canvas.bind('<Button-1>', self.addOrRemoveWall)
@@ -251,12 +265,13 @@ class LevelViewController:
     def addWall(self, event):   # Called on mouse clicked and dragged
         if self.__checkCoord(event.x, event.y):
             return
-        self._level.setWall(x=event.x//8, y=event.y//8)
+        self._level.setItem(x=event.x//8, y=event.y//8, kind=self._currentTool.get())
 
     def addOrRemoveWall(self, event):   # Called on mouse clicked only
         if self.__checkCoord(event.x, event.y):
             return
-        self._level.setOrUnsetWall(x=event.x//8, y=event.y//8) # Convert to level coordiantes using floor division
+        # Convert to level coordiantes using floor division
+        self._level.setOrUnsetItem(x=event.x//8, y=event.y//8, kind=self._currentTool.get())
 
     def addColony(self, event):
         print("add colony")
@@ -302,8 +317,9 @@ class LevelView(tk.Canvas):
     WIDTH  = 640
     HEIGHT = 640
 
-    WALL_COLOR = 'black'
-    ANT_COLOR  = 'red'
+    WALL_COLOR  = 'black'
+    WATER_COLOR = '#4696FF'
+    ANT_COLOR   = 'red'
     
     def __init__(self, parent):
         tk.Canvas.__init__(self, parent, width=self.WIDTH, height=self.HEIGHT, relief=tk.GROOVE, bd=1)
@@ -313,9 +329,12 @@ class LevelView(tk.Canvas):
         self.clear()    # Clear widget on each call
         for i in range(len(level)):
           for j in range(len(level[0])):
-            posX, posY = i*8, j*8               
-            if level[i][j] == Level.WALL:
+            posX, posY = i*8, j*8 
+            if level[i][j] is Level.WALL:      # Pick up the right color
                 self.create_rectangle(posX, posY, posX+8, posY+8, fill=self.WALL_COLOR)
+            if level[i][j] is Level.WATER:
+                self.create_rectangle(posX, posY, posX+8, posY+8, fill=self.WATER_COLOR, outline=self.WATER_COLOR)
+            
 
     def repaintAnt(self, ant):
         item = self._items.get(ant._id)
@@ -346,10 +365,31 @@ class ControlsView(tk.Frame):
         self._reset.pack()
         self._debug = tk.Button(self, text="Debug", width=self.BTN_WIDTH, highlightbackground='gray')
         self._debug.pack()
-
+ 
     def switchBtnState(self):
         for btn in (self._run, self._stop, self._reset):
             btn.config(state='disabled') if btn['state'] == 'normal' else btn.config(state='normal')
+
+
+'''
+classdoc
+'''
+class ToolboxView(tk.Frame):
+
+    MODES = [
+        ('Wall', 'wall'),
+        ('Water', 'water'),
+        ('Colony', 'colo'),
+        ('Food', 'food')
+    ]
+
+    def __init__(self, parent):
+        tk.Frame.__init__(self, parent)
+        self._buttons = []
+        for text, mode in self.MODES:
+            btn = tk.Radiobutton(parent, text=text, value=mode, indicatoron=0, bg='gray')
+            btn.pack(anchor='w')
+            self._buttons.append(btn)
 
 
 ###############################
@@ -363,8 +403,9 @@ application delegate
 class AppDelegate(Singleton):
     
     def __init__(self, root):
-        root.title('Dummy Ants')
+        root.title('Lego Colony Optimization')
         root.resizable(0,0)
+        root.config(bg='gray')
         Level()
         LevelViewController(root)
 
