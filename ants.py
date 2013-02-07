@@ -120,7 +120,7 @@ classdoc
 '''
 class Ant(threading.Thread):
 
-    SPEED = .07
+    SPEED = .05
     DIRECTIONS = [
         ('EAST', (4, 0)),
         ('NORTHEAST', (4, -4)),
@@ -344,7 +344,7 @@ class MainController:
         for colony in self._colonies:
             colony.genocide()
         self._controls.switchBtnState()
-        self_isRunning = False
+        self._isRunning = False
 
     def debug(self):
         Level._instance.log()
