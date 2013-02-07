@@ -321,7 +321,7 @@ class MainController:
             if self._isRunning is True: return
             else:
                 posX, posY = (event.x//8)*8, (event.y//8)*8     # Makes sure location is mutliple of 2
-                self.__newColony(event.x, event.y) 
+                self.__newColony(posX, posY) 
         self.__editLevel(event, True)
 
     # Buttons events handlers
