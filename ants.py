@@ -218,7 +218,7 @@ class Level(Singleton):
 '''
 classdoc
 '''
-class LevelViewController:
+class MainController:
 
     ANTS_COUNT = 500
     
@@ -226,7 +226,8 @@ class LevelViewController:
         # setup needed models
         self._level = Level._instance
         self._level._observer.addCallback(self.levelChanged)
-        self._colony = None
+        #self._colony = None
+        self._colonies = None
         self.__renewColony()
         # setup views
         left = tk.Frame(root, bg='gray')
@@ -249,32 +250,36 @@ class LevelViewController:
         self._canvas = LevelView(parent=root)
         self._canvas.bind('<Button-1>', self.addOrRemoveWall)
         self._canvas.bind('<B1-Motion>', self.addWall)
-        self._canvas.bind('<Button-2>', self.addColony)
         self._canvas.pack(side='left', anchor='n')
         
-
     # Private methods
-    def __checkCoord(self, x, y):
-        return x <= 0 or y <= 0 or x >= LevelView.WIDTH or y >= LevelView.HEIGHT
+    def __validCoords(self, x, y):
+        return x > 0 and y > 0 and x < LevelView.WIDTH and y < LevelView.HEIGHT
+
+    def __toLevelCoords(self, event):
+        # Convert to level coordiantes using floor division
+        x = int(self._canvas.canvasx(event.x))//8
+        y = int(self._canvas.canvasy(event.y))//8
+        return x, y
 
     def __renewColony(self):
         self._colony = Colony(self.ANTS_COUNT)
         self._colony._members.addCallback(self.antMoved)
 
+    def __editWalls(self, event, removable=False):
+        if not self.__validCoords(event.x, event.y): return
+        coords = self.__toLevelCoords(event)
+        if removable:
+            self._level.setOrUnsetItem(coords[0], coords[1], kind=self._currentTool.get())
+        else:
+            self._level.setItem(coords[0], coords[1], kind=self._currentTool.get())
+
     # Canvas events handler
     def addWall(self, event):   # Called on mouse clicked and dragged
-        if self.__checkCoord(event.x, event.y):
-            return
-        self._level.setItem(x=event.x//8, y=event.y//8, kind=self._currentTool.get())
-
+        self.__editWalls(event)
+        
     def addOrRemoveWall(self, event):   # Called on mouse clicked only
-        if self.__checkCoord(event.x, event.y):
-            return
-        # Convert to level coordiantes using floor division
-        self._level.setOrUnsetItem(x=event.x//8, y=event.y//8, kind=self._currentTool.get())
-
-    def addColony(self, event):
-        print("add colony")
+        self.__editWalls(event, True)
 
     # Buttons events handlers
     def resetLevel(self):
@@ -285,8 +290,9 @@ class LevelViewController:
             self._canvas.clear()
 
     def runSimulation(self):
-        self._controls.switchBtnState()
-        self._colony.explore()
+        if not self._colonies:
+            self._controls.switchBtnState()
+            self._colony.explore()
 
     def stopSimulation(self):
         self._colony.genocide()
@@ -317,9 +323,9 @@ class LevelView(tk.Canvas):
     WIDTH  = 640
     HEIGHT = 640
 
-    WALL_COLOR  = 'black'
+    WALL_COLOR  = '#1D1D1D'
     WATER_COLOR = '#4696FF'
-    ANT_COLOR   = 'red'
+    ANT_COLOR   = '#E24F42'
     
     def __init__(self, parent):
         tk.Canvas.__init__(self, parent, width=self.WIDTH, height=self.HEIGHT, relief=tk.GROOVE, bd=1)
@@ -334,7 +340,6 @@ class LevelView(tk.Canvas):
                 self.create_rectangle(posX, posY, posX+8, posY+8, fill=self.WALL_COLOR)
             if level[i][j] is Level.WATER:
                 self.create_rectangle(posX, posY, posX+8, posY+8, fill=self.WATER_COLOR, outline=self.WATER_COLOR)
-            
 
     def repaintAnt(self, ant):
         item = self._items.get(ant._id)
@@ -407,7 +412,7 @@ class AppDelegate(Singleton):
         root.resizable(0,0)
         root.config(bg='gray')
         Level()
-        LevelViewController(root)
+        MainController(root)
 
 
 '''
