@@ -94,11 +94,12 @@ classdoc
 '''
 class Colony:
     
-    def __init__(self, mem_count):
+    def __init__(self, mem_count, x, y, id):
         self._level = Level._instance
         self._members = ObservableList()
         for i in range(mem_count):
-            ant = Ant(index=i)
+            identity = '{}_{}'.format(id, i)
+            ant = Ant(identity=identity, x=x, y=y)
             ant._observer.addCallback(self.memberMoved)
             self._members.append(ant)   # Use addElement instead of append to trigger callbacks
 
@@ -111,7 +112,7 @@ class Colony:
             ant.kill()
 
     def memberMoved(self, ant):
-        self._members.upElement(ant._id, ant)
+        self._members.upElement(int(ant._id.split('_')[1]), ant)
 
 
 '''
@@ -119,22 +120,32 @@ classdoc
 '''
 class Ant(threading.Thread):
 
-    SPEED = .02
+    SPEED = .07
+    DIRECTIONS = [
+        ('EAST', (4, 0)),
+        ('NORTHEAST', (4, -4)),
+        ('NORTH', (0, -4)),
+        ('NORTHWEST', (-4, -4)),
+        ('WEST', (-4, 0)),
+        ('SOUTHWEST', (-4, 4)),
+        ('SOUTH', (0, 4)),
+        ('SOUTHEAST', (4, 4))
+    ]
 
-    def __init__(self, index, x=8, y=8):     # init after limit
+    def __init__(self, identity, x=8, y=8):     # init after limit
         threading.Thread.__init__(self)
         self._level = Level._instance
-        self._id = index
+        self._id = identity
         self._position = (x, y)
         self._observer = Observable(initialValue=self)
         self._stopevent = threading.Event()
 
     def run(self):
         while not self._stopevent.isSet():
-            randmove = (random.choice([-4, 0, 4]), random.choice([-4, 0, 4]))   # A random move
+            self._stopevent.wait(self.SPEED)                # waits before next move
+            randmove = random.choice(self.DIRECTIONS)[1]    # random move in available directions range
             newloc = tuple(map(lambda x, y: x + y, self._position, randmove))   # Merge move to old location
             posX, posY = newloc[0], newloc[1]
-            self._stopevent.wait(self.SPEED)
             if not self._level.collide(posX//8, posY//8) and posX > 0 and posY > 0:     # Check availability
                 self._position = newloc
                 self._observer.set(self)
@@ -175,6 +186,44 @@ class Level(Singleton):
                     var[i].append(self.EMPTY)
         return var
 
+    def __addObstacle(self, x, y, kind):
+        if kind == 'wall':
+            self._map[x][y] = self.WALL
+        elif kind == 'water':
+            self._map[x][y] = self.WATER
+        self._observer.set(self._map)
+
+    def __addAgent(self, x, y, kind):
+        for i in range(x-1, x+1):
+            for j in range(y-1, y+1):
+                if kind == 'colony':
+                    self._map[i][j] = self.COLONY
+                elif kind == 'food':
+                    self._map[i][j] = self.FOOD
+        self._observer.set(self._map)
+
+    def __setItem(self, x, y, kind):
+        if not self.collide(x, y):
+            if kind in ['wall', 'water']:
+                self.__addObstacle(x, y, kind)
+            elif kind in ['colony', 'food']:
+                self.__addAgent(x, y, kind)
+            else:
+                raise Exception('Kind {} does not exist'.format(kind))
+
+    def __unsetItem(self, x, y, kind):
+        if self.__canUnset(x, y, kind):
+            self._map[x][y] = self.EMPTY
+            self._observer.set(self._map)
+
+    def __canUnset(self, x, y, kind):
+        if kind == 'wall':
+            return self._map[x][y] == self.WALL
+        if kind == 'water':
+            return self._map[x][y] == self.WATER
+        else:
+            return False
+
     def reset(self):
         self._map = self.__genEmptyLevel()
         self._observer.set(self._map)
@@ -182,23 +231,14 @@ class Level(Singleton):
     def collide(self, x, y):
         return self._map[x][y] != self.EMPTY
 
-    def setOrUnsetItem(self, x, y, kind):
-        if self.collide(x, y):
-            self.unsetItem(x, y)
-        else:
-            self.setItem(x, y, kind)
-
-    def setItem(self, x, y, kind):
+    def addItem(self, x, y, kind, removable=False):
+        if not removable:
+            self.__setItem(x, y, kind)
+            return
         if not self.collide(x, y):
-            if kind == 'wall':
-                self._map[x][y] = self.WALL
-            elif kind == 'water':
-                self._map[x][y] = self.WATER
-            self._observer.set(self._map)
-
-    def unsetItem(self, x, y):
-        self._map[x][y] = self.EMPTY
-        self._observer.set(self._map)
+            self.addItem(x, y, kind)
+        else:
+            self.__unsetItem(x, y, kind)
 
     # Debugging
     def log(self):
@@ -220,15 +260,14 @@ classdoc
 '''
 class MainController:
 
-    ANTS_COUNT = 500
+    ANTS_COUNT = 100
     
     def __init__(self, root):
         # setup needed models
         self._level = Level._instance
         self._level._observer.addCallback(self.levelChanged)
-        #self._colony = None
-        self._colonies = None
-        self.__renewColony()
+        self._colonies = []
+        self._isRunning = False
         # setup views
         left = tk.Frame(root, bg='gray')
         left.pack(side='left', anchor='n')
@@ -248,8 +287,8 @@ class MainController:
             btn.config(variable=self._currentTool)
         # setup canvas view
         self._canvas = LevelView(parent=root)
-        self._canvas.bind('<Button-1>', self.addOrRemoveWall)
-        self._canvas.bind('<B1-Motion>', self.addWall)
+        self._canvas.bind('<Button-1>', self.addOrRemoveItem)
+        self._canvas.bind('<B1-Motion>', self.addItem)
         self._canvas.pack(side='left', anchor='n')
         
     # Private methods
@@ -262,42 +301,50 @@ class MainController:
         y = int(self._canvas.canvasy(event.y))//8
         return x, y
 
-    def __renewColony(self):
-        self._colony = Colony(self.ANTS_COUNT)
-        self._colony._members.addCallback(self.antMoved)
+    def __newColony(self, x, y):
+        colony = Colony(self.ANTS_COUNT, x, y, len(self._colonies)+1)
+        colony._members.addCallback(self.antMoved)
+        self._colonies.append(colony)
 
-    def __editWalls(self, event, removable=False):
+    def __editLevel(self, event, removable=False):
         if not self.__validCoords(event.x, event.y): return
         coords = self.__toLevelCoords(event)
-        if removable:
-            self._level.setOrUnsetItem(coords[0], coords[1], kind=self._currentTool.get())
-        else:
-            self._level.setItem(coords[0], coords[1], kind=self._currentTool.get())
+        self._level.addItem(coords[0], coords[1], self._currentTool.get(), removable)
 
     # Canvas events handler
-    def addWall(self, event):   # Called on mouse clicked and dragged
-        self.__editWalls(event)
+    def addItem(self, event):   # Called on mouse clicked and dragged
+        if self._currentTool.get() in ['colony', 'food']: return
+        self.__editLevel(event)
         
-    def addOrRemoveWall(self, event):   # Called on mouse clicked only
-        self.__editWalls(event, True)
+    def addOrRemoveItem(self, event):   # Called on mouse clicked only
+        if self._currentTool.get() == 'colony':
+            if self._isRunning is True: return
+            else: self.__newColony(event.x, event.y) 
+        self.__editLevel(event, True)
 
     # Buttons events handlers
     def resetLevel(self):
-        result = tk.messagebox.askyesno("Confirmation", "Are You Sure?", icon='warning')
+        result = tk.messagebox.askyesno("Confirmation", "Are You Sure?", icon='info')
         if result == True:
-            self.__renewColony()
+            self._colonies = []
             self._level.reset()
             self._canvas.clear()
 
     def runSimulation(self):
-        if not self._colonies:
+        if not self._colonies: 
+            tk.messagebox.showinfo("Info", "You need to place at least one colony", icon='warning')
+            return
+        self._isRunning = True
+        if self._colonies:
             self._controls.switchBtnState()
-            self._colony.explore()
+            for colony in self._colonies:
+                colony.explore()
 
     def stopSimulation(self):
-        self._colony.genocide()
-        self.__renewColony()
+        for colony in self._colonies:
+            colony.genocide()
         self._controls.switchBtnState()
+        self_isRunning = False
 
     def debug(self):
         Level._instance.log()
@@ -323,9 +370,11 @@ class LevelView(tk.Canvas):
     WIDTH  = 640
     HEIGHT = 640
 
-    WALL_COLOR  = '#1D1D1D'
-    WATER_COLOR = '#4696FF'
-    ANT_COLOR   = '#E24F42'
+    WALL_COLOR   = '#1D1D1D'
+    WATER_COLOR  = '#4696FF'
+    COLONY_COLOR = '#5E3A16'
+    FOOD_COLOR   = '#FF5B00'
+    ANT_COLOR    = '#E24F42'
     
     def __init__(self, parent):
         tk.Canvas.__init__(self, parent, width=self.WIDTH, height=self.HEIGHT, relief=tk.GROOVE, bd=1)
@@ -337,9 +386,13 @@ class LevelView(tk.Canvas):
           for j in range(len(level[0])):
             posX, posY = i*8, j*8 
             if level[i][j] is Level.WALL:      # Pick up the right color
-                self.create_rectangle(posX, posY, posX+8, posY+8, fill=self.WALL_COLOR)
+                self.create_rectangle(posX, posY, posX+8, posY+8, fill=self.WALL_COLOR, outline=self.WALL_COLOR)
             if level[i][j] is Level.WATER:
                 self.create_rectangle(posX, posY, posX+8, posY+8, fill=self.WATER_COLOR, outline=self.WATER_COLOR)
+            if level[i][j] is Level.COLONY:
+                self.create_rectangle(posX, posY, posX+8, posY+8, fill=self.COLONY_COLOR, outline=self.COLONY_COLOR)
+            if level[i][j] is Level.FOOD:
+                self.create_rectangle(posX, posY, posX+8, posY+8, fill=self.FOOD_COLOR, outline=self.FOOD_COLOR)
 
     def repaintAnt(self, ant):
         item = self._items.get(ant._id)
@@ -384,7 +437,7 @@ class ToolboxView(tk.Frame):
     MODES = [
         ('Wall', 'wall'),
         ('Water', 'water'),
-        ('Colony', 'colo'),
+        ('Colony', 'colony'),
         ('Food', 'food')
     ]
 
