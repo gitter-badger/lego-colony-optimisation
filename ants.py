@@ -194,8 +194,8 @@ class Level(Singleton):
         self._observer.set(self._map)
 
     def __addAgent(self, x, y, kind):
-        for i in range(x-1, x+1):
-            for j in range(y-1, y+1):
+        for i in [x, x+1, x+2]:
+            for j in [y, y+1, y+2]:
                 if kind == 'colony':
                     self._map[i][j] = self.COLONY
                 elif kind == 'food':
@@ -319,7 +319,9 @@ class MainController:
     def addOrRemoveItem(self, event):   # Called on mouse clicked only
         if self._currentTool.get() == 'colony':
             if self._isRunning is True: return
-            else: self.__newColony(event.x, event.y) 
+            else:
+                posX, posY = (event.x//8)*8, (event.y//8)*8     # Makes sure location is mutliple of 2
+                self.__newColony(event.x, event.y) 
         self.__editLevel(event, True)
 
     # Buttons events handlers
