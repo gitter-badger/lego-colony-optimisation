@@ -139,15 +139,17 @@ class Ant(threading.Thread):
         self._position = (x, y)
         self._observer = Observable(initialValue=self)
         self._stopevent = threading.Event()
+        self._currentDirection = Observable((0, 0))
 
     def run(self):
         while not self._stopevent.isSet():
-            self._stopevent.wait(self.SPEED)                # waits before next move
-            randmove = random.choice(self.DIRECTIONS)[1]    # random move in available directions range
-            newloc = tuple(map(lambda x, y: x + y, self._position, randmove))   # Merge move to old location
+            self._stopevent.wait(AppDelegate._instance._globalTimerPick.get()/100)    # waits before next move
+            randmove = random.choice(self.DIRECTIONS)[1]                              # random move in available directions range
+            newloc = tuple(map(lambda x, y: x + y, self._position, randmove))         # Merge move to old location
             posX, posY = newloc[0], newloc[1]
-            if not self._level.collide(posX//8, posY//8) and posX > 0 and posY > 0:     # Check availability
+            if not self._level.collide(posX//8, posY//8) and posX > 0 and posY > 0:   # Check availability
                 self._position = newloc
+                self._currentDirection = randmove
                 self._observer.set(self)
 
     def kill(self):
@@ -273,18 +275,25 @@ class MainController:
         left.pack(side='left', anchor='n')
         # setup controls view
         self._controls = ControlsView(parent=left)
-        self._controls.pack(anchor='w')
+        self._controls.pack(anchor='w', padx=5, pady=5)
         self._controls._run.config(command=self.runSimulation)      # register view callbacks
         self._controls._stop.config(command=self.stopSimulation)
         self._controls._reset.config(command=self.resetLevel)
         self._controls._debug.config(command=self.debug)
         # setup toolbox
         self._toolbox = ToolboxView(parent=left)
-        self._toolbox.pack(anchor='w')
+        self._toolbox.pack(anchor='w', padx=5, pady=5)
         self._currentTool = tk.StringVar()
         self._currentTool.set('wall')       # initial value is wall
         for btn in self._toolbox._buttons:
             btn.config(variable=self._currentTool)
+        # setup settings view
+        self._settings = SettingsView(parent=left)
+        self._settings.pack(anchor='w', padx=5, pady=5)
+        self._currentColonySize = tk.IntVar()
+        self._currentColonySize.set(50)
+        self._settings._colonySizeBox.config(textvariable=self._currentColonySize)
+        self._settings._antSpeedBox.config(textvariable=AppDelegate._instance._globalTimerPick)
         # setup canvas view
         self._canvas = LevelView(parent=root)
         self._canvas.bind('<Button-1>', self.addOrRemoveItem)
@@ -302,7 +311,8 @@ class MainController:
         return x, y
 
     def __newColony(self, x, y):
-        colony = Colony(self.ANTS_COUNT, x, y, len(self._colonies)+1)
+        print(self._currentColonySize.get())
+        colony = Colony(self._currentColonySize.get(), x, y, len(self._colonies)+1)
         colony._members.addCallback(self.antMoved)
         self._colonies.append(colony)
 
@@ -384,6 +394,7 @@ class LevelView(tk.Canvas):
 
     def repaintLevel(self, level):
         self.clear()    # Clear widget on each call
+        self._items = {}
         for i in range(len(level)):
           for j in range(len(level[0])):
             posX, posY = i*8, j*8 
@@ -396,13 +407,15 @@ class LevelView(tk.Canvas):
             if level[i][j] is Level.FOOD:
                 self.create_rectangle(posX, posY, posX+8, posY+8, fill=self.FOOD_COLOR, outline=self.FOOD_COLOR)
 
+
     def repaintAnt(self, ant):
         item = self._items.get(ant._id)
         if item is not None:
-            self.delete(item)
-        posX, posY = ant._position[0], ant._position[1]
-        self._items[ant._id] = self.create_rectangle(posX, posY, posX+4, posY+4, fill=self.ANT_COLOR)
-        self.update()       
+            dirX, dirY = ant._currentDirection[0], ant._currentDirection[1]
+            self.move(item, dirX, dirY)
+        else:
+            posX, posY = ant._position[0], ant._position[1]
+            self._items[ant._id] = self.create_rectangle(posX, posY, posX+4, posY+4, fill=self.ANT_COLOR)    
 
     def clear(self):
         self.delete('all')
@@ -411,12 +424,12 @@ class LevelView(tk.Canvas):
 '''
 classdoc
 '''
-class ControlsView(tk.Frame):
+class ControlsView(tk.LabelFrame):
 
-    BTN_WIDTH = 8 
+    BTN_WIDTH = 9 
 
     def __init__(self, parent):
-        tk.Frame.__init__(self, parent, bg='gray')
+        tk.LabelFrame.__init__(self, parent, bg='gray', text='Controls')
         self._run = tk.Button(self, text="Run", width=self.BTN_WIDTH, highlightbackground='gray')
         self._run.pack()
         self._stop = tk.Button(self, text="Stop", width=self.BTN_WIDTH, state='disabled', highlightbackground='gray')
@@ -434,7 +447,7 @@ class ControlsView(tk.Frame):
 '''
 classdoc
 '''
-class ToolboxView(tk.Frame):
+class ToolboxView(tk.LabelFrame):
 
     MODES = [
         ('Wall', 'wall'),
@@ -444,12 +457,29 @@ class ToolboxView(tk.Frame):
     ]
 
     def __init__(self, parent):
-        tk.Frame.__init__(self, parent)
+        tk.LabelFrame.__init__(self, parent, text='Tools', bg='gray')
         self._buttons = []
         for text, mode in self.MODES:
-            btn = tk.Radiobutton(parent, text=text, value=mode, indicatoron=0, bg='gray')
+            btn = tk.Radiobutton(self, text=text, value=mode, indicatoron=0, bg='gray', width=12, justify='left')
             btn.pack(anchor='w')
             self._buttons.append(btn)
+
+'''
+classdoc
+'''
+class SettingsView(tk.LabelFrame):
+
+    def __init__(self, parent):
+        tk.LabelFrame.__init__(self, parent, text='Settings', bg='gray')
+        self._label = tk.Label(self, text="Colony size:", bg='gray', width=12, pady=5)
+        self._label.pack()
+        self._colonySizeBox = tk.Spinbox(self, width=8, from_=50, to=100, bg='gray', highlightbackground='gray')
+        self._colonySizeBox.pack()
+        self._label = tk.Label(self, text="Ants speed:", bg='gray', width=12, pady=5)
+        self._label.pack()
+        self._antSpeedBox = tk.Spinbox(self, width=8, from_=1, to=10, bg='gray', highlightbackground='gray')
+        self._antSpeedBox.pack()
+
 
 
 ###############################
@@ -466,6 +496,8 @@ class AppDelegate(Singleton):
         root.title('Lego Colony Optimization')
         root.resizable(0,0)
         root.config(bg='gray')
+        self._globalTimerPick = tk.IntVar()
+        self._globalTimerPick.set(5)
         Level()
         MainController(root)
 
