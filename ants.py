@@ -9,6 +9,7 @@ import tkinter.messagebox
 import random
 import threading
 import time
+import math
 
 
 ###############################
@@ -136,24 +137,50 @@ class Ant(threading.Thread):
         threading.Thread.__init__(self)
         self._level = Level._instance
         self._id = identity
-        self._position = (x, y)
+        self._homePosition = (x, y) 
+        self._currentPosition = (x, y)
         self._observer = Observable(initialValue=self)
         self._stopevent = threading.Event()
         self._currentDirection = Observable((0, 0))
+        self._allowStepBack = False
 
     def run(self):
         while not self._stopevent.isSet():
-            self._stopevent.wait(AppDelegate._instance._globalTimerPick.get()/100)    # waits before next move
-            randmove = random.choice(self.DIRECTIONS)[1]                              # random move in available directions range
-            newloc = tuple(map(lambda x, y: x + y, self._position, randmove))         # Merge move to old location
-            posX, posY = newloc[0], newloc[1]
-            if not self._level.collide(posX//8, posY//8) and posX > 0 and posY > 0:   # Check availability
-                self._position = newloc
-                self._currentDirection = randmove
-                self._observer.set(self)
+            self._stopevent.wait((11 - AppDelegate._instance._globalTimerPick.get())/100)               # waits before next move
+            direction =  self.__gatherNextDirections()                                                  # get next available locations
+            if not direction:                                                                           
+                self._allowStepBack = True                                                              # allow step back on next move
+                continue
+            else:
+                randmove = random.choice(direction)                                                     # choose from available locations
+                self._currentPosition = tuple(map(lambda x, y: x + y, self._currentPosition, randmove)) # merge move to old location
+                self._currentDirection = randmove                                                       # define next direction
+                self._observer.set(self)                                                                # trigger redraw
+                #self._allowStepBack = False
 
     def kill(self):
         self._stopevent.set()
+
+    def __gatherNextDirections(self):
+        currentDistance = self.__distanceToHome(self._currentPosition)
+        nextDirections = []
+        for label, direction in self.DIRECTIONS:
+            newLocation = tuple(map(lambda x, y: x + y, self._currentPosition, direction))
+            posX, posY = newLocation[0], newLocation[1]
+            if self._level.foundFood(posX//8, posY//8):
+                print("Ant with id {}".format(self._id))
+            if not self._level.collide(posX//8, posY//8) and posX > 0 and posY > 0:
+                distance = self.__distanceToHome(newLocation)
+                if distance > currentDistance and not self._allowStepBack:
+                    nextDirections.append(direction)
+                elif distance < currentDistance and self._allowStepBack:
+                    nextDirections.append(direction)
+        return nextDirections
+
+    def __distanceToHome(self, location):
+        xoffset = abs(self._homePosition[0] - location[0])
+        yoffset = abs(self._homePosition[1] - location[1])
+        return math.sqrt(pow(xoffset, 2) + pow(yoffset, 2))
 
 
 '''
@@ -233,6 +260,9 @@ class Level(Singleton):
     def collide(self, x, y):
         return self._map[x][y] != self.EMPTY
 
+    def foundFood(self, x, y):
+        return self._map[x][y] == self.FOOD
+
     def addItem(self, x, y, kind, removable=False):
         if not removable:
             self.__setItem(x, y, kind)
@@ -311,7 +341,6 @@ class MainController:
         return x, y
 
     def __newColony(self, x, y):
-        print(self._currentColonySize.get())
         colony = Colony(self._currentColonySize.get(), x, y, len(self._colonies)+1)
         colony._members.addCallback(self.antMoved)
         self._colonies.append(colony)
@@ -414,7 +443,7 @@ class LevelView(tk.Canvas):
             dirX, dirY = ant._currentDirection[0], ant._currentDirection[1]
             self.move(item, dirX, dirY)
         else:
-            posX, posY = ant._position[0], ant._position[1]
+            posX, posY = ant._currentPosition[0], ant._currentPosition[1]
             self._items[ant._id] = self.create_rectangle(posX, posY, posX+4, posY+4, fill=self.ANT_COLOR)    
 
     def clear(self):
@@ -464,6 +493,7 @@ class ToolboxView(tk.LabelFrame):
             btn.pack(anchor='w')
             self._buttons.append(btn)
 
+
 '''
 classdoc
 '''
@@ -471,15 +501,15 @@ class SettingsView(tk.LabelFrame):
 
     def __init__(self, parent):
         tk.LabelFrame.__init__(self, parent, text='Settings', bg='gray')
-        self._label = tk.Label(self, text="Colony size:", bg='gray', width=12, pady=5)
-        self._label.pack()
-        self._colonySizeBox = tk.Spinbox(self, width=8, from_=50, to=100, bg='gray', highlightbackground='gray')
+        label = tk.Label(self, text="Colony size:", bg='gray', width=12, pady=5).pack()
+        self._colonySizeBox = tk.Spinbox(self, width=8, from_=1, to=100, bg='gray', highlightbackground='gray')
         self._colonySizeBox.pack()
-        self._label = tk.Label(self, text="Ants speed:", bg='gray', width=12, pady=5)
-        self._label.pack()
+        tk.Label(self, text="Ants speed:", bg='gray', width=12, pady=5).pack()
         self._antSpeedBox = tk.Spinbox(self, width=8, from_=1, to=10, bg='gray', highlightbackground='gray')
         self._antSpeedBox.pack()
-
+        tk.Label(self, text="Moves count:", bg='gray', width=12, pady=5).pack()
+        self._AntMoveCount = tk.Spinbox(self, width=8, from_=500, to=5000, bg='gray', highlightbackground='gray')
+        self._AntMoveCount.pack()
 
 
 ###############################
