@@ -156,7 +156,8 @@ class Ant(threading.Thread):
                 self._currentPosition = tuple(map(lambda x, y: x + y, self._currentPosition, randmove)) # merge move to old location
                 self._currentDirection = randmove                                                       # define next direction
                 self._observer.set(self)                                                                # trigger redraw
-                #self._allowStepBack = False
+            if self._allowStepBack and self.__isHomeNeighborhood():                                     # ant gets back home
+                self._allowStepBack = False                                                             # restart exploration 
 
     def kill(self):
         self._stopevent.set()
@@ -167,8 +168,12 @@ class Ant(threading.Thread):
         for label, direction in self.DIRECTIONS:
             newLocation = tuple(map(lambda x, y: x + y, self._currentPosition, direction))
             posX, posY = newLocation[0], newLocation[1]
+            # TODO: handle food/pheronome
             if self._level.foundFood(posX//8, posY//8):
                 print("Ant with id {}".format(self._id))
+                self._allowStepBack = True
+                continue;
+            # determine available locations
             if not self._level.collide(posX//8, posY//8) and posX > 0 and posY > 0:
                 distance = self.__distanceToHome(newLocation)
                 if distance > currentDistance and not self._allowStepBack:
@@ -181,6 +186,11 @@ class Ant(threading.Thread):
         xoffset = abs(self._homePosition[0] - location[0])
         yoffset = abs(self._homePosition[1] - location[1])
         return math.sqrt(pow(xoffset, 2) + pow(yoffset, 2))
+
+    def __isHomeNeighborhood(self):
+        inX = self._currentPosition[0] in range(self._homePosition[0]-4, self._homePosition[0]+4)
+        inY = self._currentPosition[1] in range(self._homePosition[1]-4, self._homePosition[1]+4)
+        return inX and inY
 
 
 '''
